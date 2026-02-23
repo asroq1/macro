@@ -2,18 +2,64 @@ import keyboard
 import pyautogui
 import threading
 import time
-import sys
 import os
+import platform
+from PIL import ImageChops, ImageStat
+
+try:
+    import winsound
+except ImportError:
+    winsound = None
+
+PAGE_CHANGE_THRESHOLD = 20.0
+PAGE_CHANGE_CONFIRM_COUNT = 3
+
+
+def play_alert_sound():
+    # Windows면 명확한 알림음을 내고, 그 외 OS는 터미널 벨로 폴백
+    if platform.system() == "Windows" and winsound:
+        winsound.Beep(2000, 400)
+    else:
+        print("\a", end="", flush=True)
+
+
+def screen_change_score(before_img, after_img):
+    # 성능을 위해 저해상도 흑백으로 비교
+    target_size = (200, 120)
+    before_small = before_img.convert("L").resize(target_size)
+    after_small = after_img.convert("L").resize(target_size)
+    diff = ImageChops.difference(before_small, after_small)
+    stat = ImageStat.Stat(diff)
+    return stat.mean[0]
+
 
 def click():
     # 클릭 함수에서 x, y 좌표를 받지 않고 매번 현재 마우스 위치를 사용
+    baseline_shot = pyautogui.screenshot()
+    alert_played = False
+    change_streak = 0
+
     while not exit_event.is_set():
         try:
             # 현재 마우스 위치에서 클릭
             current_x, current_y = pyautogui.position()
             pyautogui.click(current_x, current_y)
+
+            # 클릭 후 화면이 크게 바뀌면(페이지 이동으로 가정) 소리 알림
+            current_shot = pyautogui.screenshot()
+            change_score = screen_change_score(baseline_shot, current_shot)
+            if change_score >= PAGE_CHANGE_THRESHOLD:
+                change_streak += 1
+            else:
+                change_streak = 0
+
+            if change_streak >= PAGE_CHANGE_CONFIRM_COUNT and not alert_played:
+                print("페이지 전환 감지: 알림음을 재생합니다.")
+                play_alert_sound()
+                alert_played = True
+
             # 짧은 시간 대기하여 CPU 사용량 감소 및 ESC 키 감지 개선
-            time.sleep(0.01)
+            time.sleep(0.05)
         except Exception as e:
             print(f"클릭 오류: {e}")
             break
