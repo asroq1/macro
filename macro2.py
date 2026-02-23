@@ -41,8 +41,8 @@ def main():
     global exit_event
     exit_event = threading.Event()
 
-    x=414
-    y=1528
+    x=420
+    y=1534
     pyautogui.PAUSE = 0.1
 
     click_thread = threading.Thread(target=click, args=(x, y))
